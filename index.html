@@ -116,6 +116,8 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
   background:var(--sunk);border-radius:5px;padding:2px 7px;color:var(--muted)}
 .note{font-size:12.5px;color:var(--muted);margin:9px 0 0}
 .note b{color:var(--ink);font-weight:500}
+#authLink{text-decoration:none;border-color:var(--teal);color:var(--teal-ink)}
+#authLink:hover{border-color:var(--teal)}
 </style>
 
 <div class="shell">
@@ -138,6 +140,7 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
 
     <div class="transport">
       <button class="btn" id="authBtn">Sign in with GitHub</button>
+      <a class="btn" id="authLink" hidden target="_blank" rel="noopener noreferrer">Enter the code at github.com/login/device</a>
       <span class="chip" id="who" hidden></span>
       <button class="btn" id="recBtn"><span class="dot"></span><span id="recLbl">Record</span></button>
       <button class="btn primary" id="saveBtn" disabled>Save take</button>
@@ -215,6 +218,7 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
            (rest / 10).toFixed(1).padStart(4,'0');
   }
   function stamp(){ return fmt((performance.now() - T0)/1000); }
+  window.SS_log = function(msg){ log(msg); };
   function log(msg){
     var li = document.createElement('li');
     var a = document.createElement('span'); a.textContent = stamp();
@@ -224,6 +228,11 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
   }
   function setText(el, v){ if (el.textContent !== v) el.textContent = v; }
   function say(msg){ setText(statusEl, msg); }
+  // Exported HERE, not at the end of the IIFE: die() returns early on a missing
+  // THREE or a dead WebGL context, and the auth UI outside this scope still
+  // needs a way to speak. A bridge assigned after a possible early return is a
+  // bridge that is missing exactly when it matters.
+  window.SS_say = say;
   function die(msg){
     program.hidden = true;
     fallbackEl.hidden = false;
@@ -391,7 +400,7 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
   if (!RAPPID){
     // tail is minted from entropy, then immutable for the life of this browser
     RAPPID = 'pending';
-    sha256Hex(concatBytes(enc.encode('rapp/1:rappid\n'), uuidBytes())).then(function(tail){
+    mintReady = sha256Hex(concatBytes(enc.encode('rapp/1:rappid\n'), uuidBytes())).then(function(tail){
       RAPPID = tail ? ('rappid:@kody-w/second-seat:' + tail) : 'rappid:@kody-w/second-seat:unminted';
       lsSet(K_RAPPID, RAPPID);
       renderMem();
@@ -410,11 +419,27 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
     } catch (e){ CHAIN = []; }
   })();
 
+  // The first-ever visit mints its rappid asynchronously; anything appended in
+  // that window used to be dropped on the floor, so the chain lost its genesis.
+  var mintReady = Promise.resolve();
   var appending = Promise.resolve();
   function appendFrame(payload){
     // Serialised: each frame must see the true predecessor, so appends queue.
-    appending = appending.then(function(){
-      if (!storeOK || CHAIN.length >= MAX_FRAMES || RAPPID === 'pending') return;
+    appending = appending.then(function(){ return mintReady; }).then(function(){
+      if (!storeOK || CHAIN.length >= MAX_FRAMES) return;
+      // A GitHub login is [A-Za-z0-9-]{1,39}; anything else is not put in a
+      // payload, because the chain's canonical form is only defined over
+      // strings and safe integers.
+      var who = window.PILOT_NAME;
+      if (typeof who === 'string' && /^[A-Za-z0-9-]{1,39}$/.test(who) && !payload.pilot){
+        payload.pilot = who;
+      }
+      // Re-read before extending: another tab on this origin may have appended
+      // since we loaded, and two tabs writing the same seq silently clobber.
+      try {
+        var fresh = JSON.parse(lsGet(K_CHAIN) || '[]');
+        if (Array.isArray(fresh) && fresh.length > CHAIN.length) CHAIN = fresh;
+      } catch (e){}
       var prevFrame = CHAIN.length ? CHAIN[CHAIN.length - 1] : null;
       var d = new Date();
       var frame = {
@@ -440,13 +465,14 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
         return H('rapp/1:wave', pre).then(function(fh){
           frame.frame_hash = fh;
           CHAIN.push(frame);
-          lsSet(K_CHAIN, JSON.stringify(CHAIN));
+          if (!lsSet(K_CHAIN, JSON.stringify(CHAIN))) CHAIN.pop();   // stay honest
           renderMem();
         });
       });
     }).catch(function(){ /* a failed append must never break the flight */ });
     return appending;
   }
+  window.SS_frame = appendFrame;
 
   // The logbook is a replay of the chain, not a second source of truth.
   function project(){
@@ -788,14 +814,19 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
     { n:'Dutch Roll',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-44).setY(p.y+16+Math.sin(t*1.4)*13), p]; } },
     { n:'Beacon Frame',    f:function(t,p){ return [shotAnchor.clone().add(new THREE.Vector3(0,26,74)), p]; } },
     { n:"Agent's Eye",     f:function(t,p){
-        var list = R().agents || [], best = null, bd = 1e9;
-        for (var i = 0; i < list.length; i++){
-          if (!list[i].watching) continue;
-          var d = list[i].o.position.distanceToSquared(p);
-          if (d < bd){ bd = d; best = list[i]; }
+        // Host chosen once per cut. Re-picking the nearest watcher every frame
+        // teleported the camera between agents mid-shot.
+        if (!shotHost){
+          var list = R().agents || [], best = null, bd = 1e9;
+          for (var i = 0; i < list.length; i++){
+            if (!list[i].watching) continue;
+            var d = list[i].o.position.distanceToSquared(p);
+            if (d < bd){ bd = d; best = list[i]; }
+          }
+          shotHost = best;
         }
-        if (!best) return [p.clone().add(new THREE.Vector3(0,-40,60)).setY(9), p];
-        return [best.o.position.clone().setY(9.4), p];   // from the ground, looking up
+        if (!shotHost) return [p.clone().add(new THREE.Vector3(0,-40,60)).setY(9), p];
+        return [shotHost.o.position.clone().setY(9.4), p];   // ground, looking up
       } },
     { n:'Over The Crowd',  f:function(t,p){
         var list = R().agents || [];
@@ -810,9 +841,9 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
     if (lookActive(performance.now())) return 'Free look';
     return WHO === 'manual' ? 'Chase Low' : SHOTS[shot].n;
   }
-  var shotAnchor = new THREE.Vector3();
+  var shotAnchor = new THREE.Vector3(), shotHost = null;
   function cutTo(i, now){
-    shot = i; shotT = 0;
+    shot = i; shotT = 0; shotHost = null;
     shotUntil = now + (4600 + Math.random() * 2600);
     // Freeze what the shot is framing. Reading plan[beat] live meant the camera
     // teleported hundreds of units mid-shot the moment the pilot passed a beat.
@@ -914,7 +945,10 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
       pctx.fillStyle = WHO === 'auto' ? '#3FB2BB' : '#E4B54A';
       pctx.fillRect(56, plateY, 4, plateH);
       pctx.font = '500 13px "IBM Plex Mono", monospace';
-      pctx.fillText((WHO === 'auto' ? 'PILOT FLYING' : 'YOU HAVE THE STICK') +
+      var stickLabel = WHO === 'auto' ? 'PILOT FLYING'
+        : (typeof window.PILOT_NAME === 'string' && /^[A-Za-z0-9-]{1,39}$/.test(window.PILOT_NAME)
+            ? ('@' + window.PILOT_NAME.toUpperCase() + ' HAS THE STICK') : 'YOU HAVE THE STICK');
+      pctx.fillText(stickLabel +
         '  ·  REALM ' + (realm+1) + ' OF ' + REALMS.length + '  ·  ' + shotName().toUpperCase(),
         74, plateY + 24);
       pctx.fillStyle = '#E4EAEF';
@@ -1005,13 +1039,19 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
         });
       }
     });
+    // An agent wears one of two materials; traverse only reaches the worn one.
+    (Rm.agents || []).forEach(function(a){
+      if (a.idle) a.idle.dispose();
+      if (a.watch) a.watch.dispose();
+    });
     Rm.group = null;
     Rm.plan = null;
+    Rm.agents = null;
   }
   function reseed(){
     for (var i = 0; i < REALMS.length; i++) disposeRealm(REALMS[i]);
     seed = (Date.now() % 2147483647) || 7;
-    realm = 0; beat = 0;
+    realm = 0; beat = 0; seenLogged = false;
     craft.position.set(0, 60, 150); vel.set(0,0,0); heading = Math.PI;
     applyRealm();
     buildBeatList();
@@ -1166,8 +1206,8 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
         setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
         say('Saved ' + a.download + ' to your downloads.');
         log('Saved ' + a.download);
-        if (window.SS_frame) window.SS_frame({ event:'take',
-          seconds: Math.round(lastTakeSeconds), bytes: blob.size, realm: R().name });
+        appendFrame({ event:'take', seconds: Math.round(lastTakeSeconds),
+                      bytes: blob.size, realm: R().name });
       } catch (err){
         say('This browser would not accept the file.');
       }
@@ -1212,10 +1252,10 @@ kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--
    key — same origin as every other front door on kody-w.github.io, so signing in
    here signs you in there and vice versa.
 
-   The worker's Access-Control-Allow-Origin is pinned to https://kody-w.github.io,
-   which is exactly why this page is served from there and not from an artifact
-   iframe: an artifact's CSP blocks fetch outright, and the worker would refuse
-   its origin anyway. */
+   The worker's Access-Control-Allow-Origin is pinned to https://kody-w.github.io.
+   That is why this page is served from there: an artifact iframe could not do
+   this at all (its CSP blocks fetch), and any other origin is refused by the
+   worker. Served from anywhere else, sign-in fails and says so. */
 const AUTH_WORKER_URL   = "https://rapp-auth.kwildfeuer.workers.dev";
 const COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const STORAGE_KEY       = "rapp_settings";
@@ -1241,10 +1281,12 @@ async function startDeviceLogin(){
   });
   if (!r.ok) throw new Error("device start " + r.status);
   const d = await r.json();
+  // Never trust a network-supplied number straight into a timer.
+  const iv = Number(d.interval);
   pendingDeviceLogin = {
     device_code: d.device_code,
-    interval: d.interval || 5,
-    expires_at: Date.now() + (d.expires_in || 900) * 1000
+    interval: (isFinite(iv) && iv >= 1 && iv <= 60) ? iv : 5,
+    expires_at: Date.now() + (Number(d.expires_in) > 0 ? Number(d.expires_in) : 900) * 1000
   };
   return { user_code: d.user_code, verification_uri: d.verification_uri };
 }
@@ -1257,15 +1299,35 @@ async function pollDeviceLogin(){
     body: JSON.stringify({ device_code: pendingDeviceLogin.device_code,
                            client_id: COPILOT_CLIENT_ID })
   });
+  if (!r.ok){
+    // A transient 5xx/network blip must not kill an otherwise valid 15-minute
+    // sign-in; keep waiting and let expiry be the only clock that ends it.
+    return null;
+  }
   const d = await r.json();
   if (d.access_token){
     saveSettings({ ghuToken: d.access_token });
     pendingDeviceLogin = null;
     return d.access_token;
   }
-  if (d.error === "authorization_pending" || d.error === "slow_down") return null;
+  // RFC 8628 §3.5: slow_down means lengthen the interval by at least 5s.
+  if (d.error === "slow_down"){
+    pendingDeviceLogin.interval = Math.min(60, pendingDeviceLogin.interval + 5);
+    return "SLOW_DOWN";
+  }
+  if (d.error === "authorization_pending") return null;
   if (d.error){ pendingDeviceLogin = null; throw new Error(d.error_description || d.error); }
   return null;
+}
+
+function safeGitHubUrl(u){
+  // A verification_uri arrives over the network. Only GitHub, only https.
+  try {
+    const p = new URL(String(u));
+    if (p.protocol !== "https:") return null;
+    if (p.hostname !== "github.com" && p.hostname !== "www.github.com") return null;
+    return p.href;
+  } catch (e){ return null; }
 }
 
 async function fetchAndCacheUser(token){
@@ -1298,42 +1360,91 @@ function paintAuth(){
 
 document.getElementById('authBtn').addEventListener('click', async function(){
   var authBtn = document.getElementById('authBtn');
-  if (PILOT){
+  if (PILOT || getToken()){
     saveSettings({ ghuToken: "", ghUser: null });
     PILOT = null; window.PILOT_NAME = null; paintAuth();
-    window.SS_say && window.SS_say('Signed out. The logbook stays — it is this browser’s, not the account’s.');
+    if (window.SS_say) window.SS_say('Signed out. The logbook stays — it belongs to this browser, not to the account.');
     return;
   }
+  var poller = null;
   try {
     authBtn.disabled = true;
     authBtn.textContent = 'Starting…';
     var d = await startDeviceLogin();
-    window.SS_say && window.SS_say('Enter code ' + d.user_code + ' at ' + d.verification_uri + ' — this page is waiting.');
-    authBtn.textContent = d.user_code;
-    window.open(d.verification_uri, '_blank', 'noopener');
-    var tick = setInterval(async function(){
+    var uri = safeGitHubUrl(d.verification_uri);
+    if (!uri) throw new Error('the sign-in URL did not come from github.com');
+
+    // The tab is NOT opened here: this runs after an await, so the gesture is
+    // spent and the popup is blocked. Offer a link the person clicks instead.
+    authBtn.disabled = false;
+    authBtn.textContent = 'Code ' + d.user_code;
+    var link = document.getElementById('authLink');
+    link.href = uri;
+    link.textContent = 'Enter ' + d.user_code + ' at github.com/login/device';
+    link.hidden = false;
+    if (window.SS_say) window.SS_say('Enter code ' + d.user_code + ' at ' + uri + ' — this page is waiting.');
+
+    var schedule = function(){
+      if (poller) clearTimeout(poller);
+      poller = setTimeout(step, pendingDeviceLogin.interval * 1000);
+    };
+    var stop = function(msg){
+      if (poller) clearTimeout(poller);
+      poller = null;
+      pendingDeviceLogin = null;
+      link.hidden = true;
+      authBtn.disabled = false;
+      paintAuth();
+      if (msg && window.SS_say) window.SS_say(msg);
+    };
+    var step = async function(){
+      if (!pendingDeviceLogin) return;
+      if (Date.now() > pendingDeviceLogin.expires_at){
+        stop('That sign-in code expired. Start again when you like.');
+        return;
+      }
       try {
         var tok = await pollDeviceLogin();
-        if (!tok) return;
-        clearInterval(tick);
+        if (tok === "SLOW_DOWN"){ schedule(); return; }
+        if (!tok){ schedule(); return; }
+        if (poller) clearTimeout(poller);
+        poller = null;
+        link.hidden = true;
         var u = await fetchAndCacheUser(tok);
-        PILOT = u && u.login ? u.login : null; window.PILOT_NAME = PILOT;
+        // Signed in even if the /user lookup fails — the token is what counts.
+        PILOT = (u && u.login) ? u.login : ((loadSettings().ghUser || {}).login || null);
+        window.PILOT_NAME = PILOT;
         authBtn.disabled = false;
         paintAuth();
-        window.SS_say && window.SS_say(PILOT ? ('Signed in as @' + PILOT + '.') : 'Signed in.');
-        window.SS_log && window.SS_log(PILOT ? ('@' + PILOT + ' took the second seat') : 'Signed in');
-        window.SS_frame && window.SS_frame({ event:'signin', pilot: PILOT || 'unknown' });
+        if (window.SS_say) window.SS_say(PILOT ? ('Signed in as @' + PILOT + '.') : 'Signed in.');
+        if (window.SS_log) window.SS_log(PILOT ? ('@' + PILOT + ' took the second seat') : 'Signed in');
+        if (window.SS_frame) window.SS_frame({ event:'signin', pilot: PILOT || 'unknown' });
       } catch (err){
-        clearInterval(tick);
-        authBtn.disabled = false; paintAuth();
-        window.SS_say && window.SS_say('Sign-in failed: ' + err.message);
+        stop('Sign-in failed: ' + err.message);
       }
-    }, (pendingDeviceLogin && pendingDeviceLogin.interval ? pendingDeviceLogin.interval : 5) * 1000);
+    };
+    schedule();
   } catch (err){
-    authBtn.disabled = false; paintAuth();
-    window.SS_say && window.SS_say('Could not start sign-in: ' + err.message);
+    if (poller) clearTimeout(poller);
+    authBtn.disabled = false;
+    paintAuth();
+    if (window.SS_say) window.SS_say('Could not start sign-in: ' + err.message);
   }
 });
+
+// A token shared from another front door on this origin signs you in here too,
+// even though this page has never cached the user.
+(async function resumeSharedSession(){
+  if (PILOT) return;
+  var tok = getToken();
+  if (!tok) return;
+  var u = await fetchAndCacheUser(tok);
+  if (u && u.login){
+    PILOT = u.login; window.PILOT_NAME = PILOT; paintAuth();
+    if (window.SS_log) window.SS_log('@' + PILOT + ' signed in at another door');
+  }
+})();
+
 paintAuth();
 
 </script>
