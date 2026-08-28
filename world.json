@@ -1,0 +1,274 @@
+{
+  "schema": "second-seat-world/1",
+  "_about": "The nexus, as data rather than as code. Every number here is the number the browser build actually runs (check-world.py fails the build if they drift). An engine that can make a box, a torus, a light and a camera can rebuild this world from nothing but this file \u2014 which is the point: the frame travels, the destination re-derives.",
+  "_ports": "Rebuilt in Roblox by roblox/WorldImporter.luau. What ports: realms, palettes, skylines, waypoints, portals, the crowd, the flight model, the director's shot list and cadence. What does NOT port is listed under `does_not_port`.",
+  "rng": {
+    "_about": "A 31-bit LCG, seeded once, consumed in a fixed order so every engine builds the SAME world from the same seed. Order per realm: 70 x (height, colour-pick, width, depth, angle, radius), then 5 x (waypoint angle-spin once, radius, height), then 16 x (agent angle, radius, speed).",
+    "algorithm": "seed = (seed * 1103515245 + 12345) & 0x7fffffff; value = seed / 0x7fffffff",
+    "default_seed": 7,
+    "reseed_ms": 600000,
+    "parity_vector": {
+      "_about": "The first eight draws from default_seed. Any engine claiming to rebuild this world must reproduce these exactly; if it cannot, its realms will not match and the port is a different world wearing the same names. Both JS and Luau hold the intermediate as an IEEE-754 double and reduce mod 2^32 (ToInt32 / bit32.band), which is why they agree.",
+      "seed": 7,
+      "values": [
+        0.59705605572,
+        0.299264788767,
+        0.542291999116,
+        0.987091899378,
+        0.672185421303,
+        0.529202938326,
+        0.869893551278,
+        0.915326595733
+      ],
+      "tolerance": 1e-09
+    }
+  },
+  "realms": [
+    {
+      "name": "THE PALE SHELF",
+      "sky": "0B1014",
+      "fog": "0B1014",
+      "ground": "0d191d",
+      "lo": "152329",
+      "hi": "2b6f74",
+      "sun": "ffe6b8",
+      "air": "9fd8dd",
+      "tall": 1.0
+    },
+    {
+      "name": "RUST BASIN",
+      "sky": "140D0B",
+      "fog": "140D0B",
+      "ground": "1d1210",
+      "lo": "2a1a15",
+      "hi": "8a4a2c",
+      "sun": "ffb27a",
+      "air": "d89a6a",
+      "tall": 0.7
+    },
+    {
+      "name": "GLASS REACH",
+      "sky": "0A0F18",
+      "fog": "0A0F18",
+      "ground": "0f1622",
+      "lo": "18202f",
+      "hi": "4a6ea8",
+      "sun": "cfe0ff",
+      "air": "8fa8d8",
+      "tall": 1.5
+    },
+    {
+      "name": "THE LOW GARDEN",
+      "sky": "0A140E",
+      "fog": "0A140E",
+      "ground": "101d14",
+      "lo": "17281c",
+      "hi": "3f8a52",
+      "sun": "d8ffcf",
+      "air": "8fd8a0",
+      "tall": 0.55
+    },
+    {
+      "name": "CINDER FLATS",
+      "sky": "14101A",
+      "fog": "14101A",
+      "ground": "1a1522",
+      "lo": "241d2e",
+      "hi": "7a4aa8",
+      "sun": "e8ccff",
+      "air": "b69ad8",
+      "tall": 0.85
+    }
+  ],
+  "ground": {
+    "size": 2600,
+    "grid_divisions": 110,
+    "y": -0.6
+  },
+  "skyline": {
+    "_about": "Spires. height is scaled by the realm's `tall`. One shared box per realm, scaled per instance.",
+    "count": 70,
+    "height_min": 12,
+    "height_range": 90,
+    "width_min": 5,
+    "width_range": 10,
+    "depth_min": 5,
+    "depth_range": 10,
+    "radius_min": 110,
+    "radius_range": 700,
+    "hi_colour_chance": 0.22
+  },
+  "waypoints": {
+    "_about": "Five per realm on a ring, evenly spaced with a per-realm random spin, each marked by a torus the pilot flies through.",
+    "count": 5,
+    "names": [
+      "Leave the pad",
+      "Run the ridge",
+      "Turn at the beacon",
+      "Low pass",
+      "Climb out"
+    ],
+    "radius_min": 260,
+    "radius_range": 320,
+    "height_min": 34,
+    "height_range": 110,
+    "ring_radius": 15,
+    "ring_tube": 0.8,
+    "arrival_distance": 34
+  },
+  "portal": {
+    "_about": "The threshold. Heimdall stands here.",
+    "position": [
+      0,
+      78,
+      -170
+    ],
+    "ring_radius": 34,
+    "ring_tube": 2.6,
+    "disc_radius": 33,
+    "disc_opacity": 0.16,
+    "travel_ms": 1500,
+    "cadence_ms_min": 65000,
+    "cadence_ms_range": 20000,
+    "pauses_while_human_flies": true
+  },
+  "crowd": {
+    "_about": "The others. They wander, and they look up when the craft comes over them.",
+    "count": 16,
+    "torso": [
+      2.4,
+      7,
+      2.4
+    ],
+    "torso_y": 3.5,
+    "head": [
+      3.0,
+      2.6,
+      3.0
+    ],
+    "head_y": 8.6,
+    "spawn_radius_min": 70,
+    "spawn_radius_range": 520,
+    "speed_min": 5,
+    "speed_range": 7,
+    "see_range": 260,
+    "see_requires_craft_above_y": 12,
+    "head_tilt_max_rad": 1.3,
+    "seen_frame_threshold": 4
+  },
+  "craft": {
+    "body": {
+      "shape": "cone",
+      "radius": 2.2,
+      "height": 9,
+      "colour": "E4B54A"
+    },
+    "fin": {
+      "shape": "box",
+      "size": [
+        11,
+        0.5,
+        2.6
+      ],
+      "z": 1,
+      "colour": "E9EEF2"
+    },
+    "spawn": [
+      0,
+      60,
+      150
+    ],
+    "spawn_heading_rad": 3.141592653589793
+  },
+  "flight": {
+    "_about": "Six controls, and nothing else drives the craft. The autopilot writes into these same six.",
+    "controls": [
+      "fwd",
+      "back",
+      "left",
+      "right",
+      "up",
+      "boost"
+    ],
+    "turn_rate_rad_s": 1.5,
+    "thrust": 110,
+    "thrust_boost": 190,
+    "climb": 62,
+    "gravity": -26,
+    "drag_per_second": 0.22,
+    "floor_y": 6,
+    "roll_rad": 0.42,
+    "autopilot": {
+      "heading_deadband_rad": 0.04,
+      "climb_when_target_above": 3,
+      "boost_beyond_distance": 160,
+      "boost_max_heading_error_rad": 0.5
+    },
+    "handback_ms": 2600
+  },
+  "director": {
+    "_about": "The camera cuts; it does not glide. A shot holds its subject for the whole take.",
+    "cut_ms_min": 4600,
+    "cut_ms_range": 2600,
+    "shots": [
+      "Chase Low",
+      "Chase High",
+      "Wing Left",
+      "Wing Right",
+      "Nose",
+      "Tail Drift",
+      "Orbit Slow",
+      "Orbit Fast",
+      "Crane Up",
+      "Crane Down",
+      "Ground Pass",
+      "Top Down",
+      "Wide Establish",
+      "Portal Approach",
+      "Through The Ring",
+      "Low Skim",
+      "High Overview",
+      "Side Track",
+      "Rear Climb",
+      "Dutch Roll",
+      "Beacon Frame",
+      "Agent's Eye",
+      "Over The Crowd",
+      "Long Lens"
+    ],
+    "manual_shot": "Chase Low",
+    "free_look_hold_ms": 2500,
+    "camera": {
+      "fov_deg": 60,
+      "chase_back": 46,
+      "chase_up": 14,
+      "min_distance": 26
+    }
+  },
+  "identity": {
+    "_about": "rapp/1. The logbook is an append-only frame chain; the counters are a projection of it.",
+    "spec": "rapp/1",
+    "anchor_revision": "rev-6",
+    "anchor_url": "https://raw.githubusercontent.com/kody-w/rapp-1/main/anchor/orient.json",
+    "kind": "memory.save",
+    "events": [
+      "boot",
+      "beat",
+      "portal",
+      "handoff",
+      "seen",
+      "take",
+      "signin",
+      "reseed"
+    ],
+    "rank_bumps_every_cycles": 3
+  },
+  "does_not_port": {
+    "_about": "Named honestly so a Roblox build does not pretend to have these.",
+    "MediaRecorder": "Recording the composited program canvas to .webm has no Roblox equivalent. Roblox has its own capture; the burned-in lower third would have to be a Billboard/SurfaceGui.",
+    "localStorage frame chain": "Would become a DataStore (server-authoritative) or a per-player attribute. Note that changes the trust model: the chain stops being the player's own browser-local record.",
+    "GitHub device-code auth": "Roblox already knows who the player is; Heimdall's sign-in is redundant there. Do not ship an OAuth flow inside Roblox.",
+    "three.js Fog / MeshStandardMaterial": "Map to Lighting.Atmosphere + FogEnd and to PBR Part materials; the look will differ and that is expected.",
+    "crypto.subtle SHA-256": "Roblox has no WebCrypto. A frame chain there needs a Luau SHA-256 implementation or a server round-trip."
+  }
+}
