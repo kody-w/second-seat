@@ -1,0 +1,1329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Second Seat — a pilot flies a world through the same controls you have, and the others below look up.">
+<style>:root{color-scheme:light dark}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Second Seat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Complete light palette on bare :root so the un-stamped (system) viewer always
+   resolves a full set; dark redefines TOKENS ONLY, in both required guards. */
+:root{
+  --paper:#F4F6F8; --surface:#FFFFFF; --sunk:#E9EEF2; --ink:#172029; --muted:#5C6B7A;
+  --hair:#D6DDE3; --rec:#C8321F; --rec-soft:#FBE9E5; --teal:#0E7C86; --teal-soft:#E1F1F2;
+  --amber:#9A6700; --amber-soft:#FFF4D6; --shadow:0 1px 0 rgba(23,32,41,.06);
+  --stage:#0B1014; --teal-ink:#0A555D;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1419; --surface:#151D24; --sunk:#0B1015; --ink:#E4EAEF; --muted:#93A1AE;
+    --hair:#24303A; --rec:#E9563F; --rec-soft:#3A1B16; --teal:#3FB2BB; --teal-soft:#0F2A2E;
+    --amber:#E4B54A; --amber-soft:#332A12; --shadow:none; --teal-ink:#5CC6CE;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1419; --surface:#151D24; --sunk:#0B1015; --ink:#E4EAEF; --muted:#93A1AE;
+  --hair:#24303A; --rec:#E9563F; --rec-soft:#3A1B16; --teal:#3FB2BB; --teal-soft:#0F2A2E;
+  --amber:#E4B54A; --amber-soft:#332A12; --shadow:none; --teal-ink:#5CC6CE;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;margin:0;text-wrap:balance;
+  letter-spacing:-.015em}
+h1{font-size:26px;font-weight:800;line-height:1.05;font-variation-settings:"opsz" 48}
+h2{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+.shell{max-width:1240px;margin:0 auto;padding:22px 20px 56px;display:grid;
+  grid-template-columns:minmax(0,1fr) 310px;gap:22px;align-items:start}
+@media (max-width:940px){.shell{grid-template-columns:minmax(0,1fr)}}
+
+header.top{grid-column:1/-1;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-bottom:14px;border-bottom:1px solid var(--hair);margin-bottom:2px}
+header.top p{margin:0;color:var(--muted);font-size:14px;max-width:62ch}
+
+.stage{background:var(--stage);border:1px solid var(--hair);border-radius:10px;overflow:hidden;
+  position:relative;box-shadow:var(--shadow)}
+.stage canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:var(--stage);
+  touch-action:none;outline-offset:-3px}
+.fallback[hidden]{display:none}
+.fallback{padding:26px;color:#E4EAEF;font-family:"IBM Plex Mono",monospace;font-size:13px;
+  line-height:1.6;background:var(--stage);aspect-ratio:16/9;display:flex;align-items:center}
+
+.transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.btn{border:1px solid var(--hair);background:var(--surface);border-radius:8px;padding:9px 14px;
+  cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:8px;
+  transition:border-color .15s,background .15s}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.armed{border-color:var(--rec);color:var(--rec);background:var(--rec-soft)}
+.btn.primary{border-color:var(--teal);color:var(--teal);background:var(--teal-soft)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--rec);flex:none}
+@media (prefers-reduced-motion:no-preference){
+  .btn.armed .dot{animation:pulse 1.4s ease-in-out infinite}
+}
+@keyframes pulse{50%{opacity:.25}}
+.tc{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:13px;
+  color:var(--muted);margin-left:auto;display:flex;gap:12px;align-items:baseline}
+.tc .size{color:var(--muted)}
+.tc .size[data-over="true"]{color:var(--rec);font-weight:500}
+
+.chip{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.09em;
+  color:var(--muted);border:1px solid var(--hair);background:var(--sunk);border-radius:6px;
+  padding:5px 9px;white-space:nowrap}
+.chip#shot{color:var(--teal-ink);border-color:var(--teal)}
+.seat{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 13px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.1em;font-weight:500;
+  border:1px solid var(--hair);background:var(--surface)}
+.seat[data-who="auto"]{color:var(--teal);border-color:var(--teal);background:var(--teal-soft)}
+.seat[data-who="manual"]{color:var(--amber);border-color:var(--amber);background:var(--amber-soft)}
+
+.rail{display:flex;flex-direction:column;gap:18px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:15px 16px;
+  box-shadow:var(--shadow)}
+.card h2{margin-bottom:11px}
+.beats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.beats li{display:grid;grid-template-columns:16px 1fr auto;gap:9px;align-items:baseline;
+  padding:6px 7px;border-radius:6px;font-size:13.5px;color:var(--muted);
+  border-left:2px solid transparent}
+.beats li .n{font-family:"IBM Plex Mono",monospace;font-size:11px}
+.beats li .d{font-family:"IBM Plex Mono",monospace;font-size:10.5px;opacity:.75;
+  font-variant-numeric:tabular-nums}
+.beats li[data-state="done"]{opacity:.5}
+.beats li[data-state="live"]{color:var(--ink);background:var(--teal-soft);border-left-color:var(--teal);
+  font-weight:500;opacity:1}
+.mem{margin:0;display:grid;grid-template-columns:1fr auto;gap:5px 12px;
+  font-family:"IBM Plex Mono",monospace;font-size:12px}
+.mem dt{color:var(--muted)}
+.mem dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
+.mem dd.hi{color:var(--teal);font-weight:500}
+.log{list-style:none;margin:0;padding:0;font-family:"IBM Plex Mono",monospace;font-size:12px;
+  display:flex;flex-direction:column;gap:6px;max-height:196px;overflow-y:auto}
+.log li{color:var(--muted);display:grid;grid-template-columns:52px 1fr;gap:9px}
+.log li b{color:var(--ink);font-weight:500}
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--hair);
+  background:var(--sunk);border-radius:5px;padding:2px 7px;color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);margin:9px 0 0}
+.note b{color:var(--ink);font-weight:500}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <h1>Second Seat</h1>
+    <p>A pilot flies this world through the same six controls you have. Take the stick whenever you
+      want — it picks up from the nearest waypoint when you let go. A director cuts between
+      twenty-four shots while it flies, and every minute or so the craft takes a portal to another
+      realm. You are not alone down there: other agents work the ground of every realm, and they
+      look up when you come over them. The film is cut while it happens, so the file is finished
+      when the flight is.</p>
+  </header>
+
+  <div>
+    <div class="stage">
+      <canvas id="program" width="1280" height="720" tabindex="0"
+        aria-label="Program monitor — the composited shot being recorded. Click, then use W A S D to fly."></canvas>
+      <div class="fallback" id="fallback" hidden></div>
+    </div>
+
+    <div class="transport">
+      <button class="btn" id="authBtn">Sign in with GitHub</button>
+      <span class="chip" id="who" hidden></span>
+      <button class="btn" id="recBtn"><span class="dot"></span><span id="recLbl">Record</span></button>
+      <button class="btn primary" id="saveBtn" disabled>Save take</button>
+      <span class="seat" id="seat" data-who="auto">PILOT FLYING</span>
+      <button class="btn" id="handBtn" disabled>Give it back</button>
+      <span class="chip" id="realm" aria-hidden="true">REALM 1/5</span>
+      <span class="chip" id="shot" aria-hidden="true">Chase Low</span>
+      <span class="chip" id="watch" aria-hidden="true">0 of 16 watching</span>
+      <span class="tc"><span id="tc">00:00.0</span><span class="size" id="size"></span></span>
+    </div>
+    <p class="note" id="status" role="status" aria-live="polite">Ready. Click the stage and press W to take the stick.</p>
+  </div>
+
+  <div class="rail">
+    <div class="card">
+      <h2>Flight plan</h2>
+      <ol class="beats" id="beats"></ol>
+    </div>
+    <div class="card">
+      <h2>Your controls</h2>
+      <div class="keys">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>Space climb</kbd><kbd>Shift boost</kbd>
+        <kbd>Drag to look</kbd>
+      </div>
+      <p class="note">Click the stage first. Touching any of them takes the stick — the pilot writes
+        into these exact six values, so there is no second, privileged path into the world.
+        <b>Dragging takes the camera, not the stick</b>: look wherever you like and the pilot keeps
+        flying.</p>
+    </div>
+    <div class="card">
+      <h2>Logbook</h2>
+      <dl class="mem" id="mem"></dl>
+      <p class="note" id="memNote"></p>
+    </div>
+    <div class="card">
+      <h2>Take log</h2>
+      <ul class="log" id="log"></ul>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var program   = document.getElementById('program');
+  var pctx      = program.getContext('2d');
+  var statusEl  = document.getElementById('status');
+  var logEl     = document.getElementById('log');
+  var beatsEl   = document.getElementById('beats');
+  var seatEl    = document.getElementById('seat');
+  var tcEl      = document.getElementById('tc');
+  var sizeEl    = document.getElementById('size');
+  var recBtn    = document.getElementById('recBtn');
+  var recLbl    = document.getElementById('recLbl');
+  var saveBtn   = document.getElementById('saveBtn');
+  var handBtn   = document.getElementById('handBtn');
+  var fallbackEl= document.getElementById('fallback');
+  var shotEl    = document.getElementById('shot');
+  var realmEl   = document.getElementById('realm');
+  var watchEl   = document.getElementById('watch');
+  var memEl     = document.getElementById('mem');
+  var memNoteEl = document.getElementById('memNote');
+
+  var T0 = performance.now();
+  function fmt(s){
+    if (!isFinite(s) || s < 0) s = 0;
+    // Round FIRST, then split — otherwise 59.97s floors to minute 0 while the
+    // seconds field rounds up to 60.0, and the clock reads 00:60.0.
+    var tenths = Math.round(s * 10);
+    var mm = Math.floor(tenths / 600);
+    var rest = tenths - mm * 600;
+    return String(mm).padStart(2,'0') + ':' +
+           (rest / 10).toFixed(1).padStart(4,'0');
+  }
+  function stamp(){ return fmt((performance.now() - T0)/1000); }
+  function log(msg){
+    var li = document.createElement('li');
+    var a = document.createElement('span'); a.textContent = stamp();
+    var b = document.createElement('b');    b.textContent = msg;
+    li.appendChild(a); li.appendChild(b);
+    logEl.insertBefore(li, logEl.firstChild);
+  }
+  function setText(el, v){ if (el.textContent !== v) el.textContent = v; }
+  function say(msg){ setText(statusEl, msg); }
+  function die(msg){
+    program.hidden = true;
+    fallbackEl.hidden = false;
+    fallbackEl.textContent = msg;
+    recBtn.disabled = handBtn.disabled = saveBtn.disabled = true;
+    say(msg);
+  }
+
+  if (!window.THREE){ die('The 3D library did not load, so the stage cannot run.'); return; }
+
+  /* ── ONE input surface ─────────────────────────────────────────────────── */
+  var controls = { fwd:0, back:0, left:0, right:0, up:0, boost:0 };
+  function zeroControls(){ for (var k in controls) controls[k] = 0; }
+
+  var WHO = 'auto', lastHuman = 0;
+
+  function setSeat(who, why){
+    if (WHO === who) return;
+    // Neither side may inherit the other's held keys: the handoff always
+    // starts from a clean stick, in both directions.
+    zeroControls();
+    WHO = who;
+    seatEl.dataset.who = who;
+    seatEl.textContent = who === 'auto' ? 'PILOT FLYING' : 'YOU HAVE THE STICK';
+    handBtn.disabled = (who === 'auto');
+    if (who === 'auto'){ beat = nearestBeat(); markBeats(); }
+    else appendFrame({ event:'handoff', realm: R().name });
+    log(why);
+  }
+
+  var KEYMAP = {
+    KeyW:'fwd', ArrowUp:'fwd', KeyS:'back', ArrowDown:'back',
+    KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right',
+    Space:'up', ShiftLeft:'boost', ShiftRight:'boost'
+  };
+  // Only swallow the key when the stage itself is focused, so Space still
+  // activates buttons and the arrows still scroll the page everywhere else.
+  function stageHasFocus(){ return document.activeElement === program; }
+
+  function onKey(down){ return function(e){
+    var k = KEYMAP[e.code];
+    if (!k || !stageHasFocus()) return;
+    e.preventDefault();
+    // ORDER MATTERS. setSeat() zeroes the stick so neither seat inherits the
+    // other's held keys — so the seat must change BEFORE this key is recorded,
+    // or the very keypress that took the stick gets wiped by the handoff.
+    if (down && WHO !== 'manual') setSeat('manual', 'You took the stick');
+    controls[k] = down ? 1 : 0;
+    // A release is human activity too — otherwise a held modifier (which never
+    // auto-repeats) hands the stick back while it is still physically down.
+    lastHuman = performance.now();
+  };}
+  addEventListener('keydown', onKey(true));
+  addEventListener('keyup',   onKey(false));
+
+  /* Press and drag on the stage to look around. This takes the CAMERA, not the
+     stick: the pilot keeps flying while you look, which is the whole point of
+     sitting in the second seat. Let go and the director takes the camera back
+     after a beat. Pointer events cover mouse, pen and touch alike. */
+  var looking = false, lookYaw = 0, lookPitch = 0.22, lastLook = 0, lastPX = 0, lastPY = 0;
+  var LOOK_HOLD = 2500;
+  function lookActive(now){ return looking || (now - lastLook) < LOOK_HOLD; }
+
+  program.addEventListener('pointerdown', function(e){
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    looking = true; lastPX = e.clientX; lastPY = e.clientY; lastLook = performance.now();
+    try { program.setPointerCapture(e.pointerId); } catch (err){}
+    program.focus();
+    e.preventDefault();
+  });
+  program.addEventListener('pointermove', function(e){
+    if (!looking) return;
+    var dx = e.clientX - lastPX, dy = e.clientY - lastPY;
+    lastPX = e.clientX; lastPY = e.clientY; lastLook = performance.now();
+    lookYaw   -= dx * 0.005;
+    lookPitch += dy * 0.005;
+    if (lookPitch >  1.25) lookPitch =  1.25;      // straight down
+    if (lookPitch < -0.85) lookPitch = -0.85;      // up past the horizon
+    e.preventDefault();
+  });
+  function endLook(e){
+    if (!looking) return;
+    looking = false; lastLook = performance.now();
+    try { program.releasePointerCapture(e.pointerId); } catch (err){}
+  }
+  program.addEventListener('pointerup', endLook);
+  program.addEventListener('pointercancel', endLook);
+
+  handBtn.addEventListener('click', function(){
+    setSeat('auto', 'Handed back to the pilot');
+    program.focus();
+  });
+
+
+  /* ── The logbook: a rapp/1 frame chain, kept in this browser ─────────────
+     The counters below are NOT stored. What is stored is an append-only chain
+     of rapp/1 frames (SPEC.md §7): eleven keys, exactly, each carrying its own
+     particle hash (the payload) and wave hash (the whole frame), each linked to
+     its predecessor. The logbook you see is a PROJECTION of that chain — replay
+     the frames and you get the numbers back. That is the whole point: the
+     frames are the record, the display is a view of them.
+
+     Two honest limits, stated rather than hidden:
+     · Payload values are restricted to strings and safe integers. Over that
+       domain a sorted-key JSON.stringify is byte-identical to RFC 8785 (JCS),
+       which is what §4 requires. Floats are never put in a payload.
+     · The DOGG anchor cannot be resolved at runtime — this page's CSP blocks
+       every network call except CDN scripts and font stylesheets. So the anchor
+       below is a PINNED SNAPSHOT, labelled with the revision and spec hash it
+       was taken from, so a reader can check it against the live anchor rather
+       than trust it.  */
+  var DOGG = {
+    anchor: 'https://raw.githubusercontent.com/kody-w/rapp-1/main/anchor/orient.json',
+    revision: 'rev-6',
+    spec_sha256: '8212bbccaf86f2dc81bd07e2fcd5184f3a157f4eee162b13a698407684b6e134',
+    kind: 'memory.save',           // a §13-registered kind, family `memory`
+    pinned: true
+  };
+
+  var K_RAPPID = 'second_seat_rappid_v1';
+  var K_CHAIN  = 'second_seat_chain_v1';
+  var MAX_FRAMES = 300;
+
+  var storeOK = true;
+  function lsGet(k){ try { return localStorage.getItem(k); } catch (e){ storeOK = false; return null; } }
+  function lsSet(k, v){ try { localStorage.setItem(k, v); return true; }
+                        catch (e){ storeOK = false; return false; } }
+
+  // §6.2 mint-once, from UUIDv4 entropy. A name is NEVER hashed into an identity.
+  function uuidBytes(){
+    var b = new Uint8Array(16);
+    (self.crypto || {}).getRandomValues ? crypto.getRandomValues(b)
+      : (function(){ for (var i=0;i<16;i++) b[i] = (Math.random()*256)|0; })();
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;   // version 4, variant 10
+    return b;
+  }
+  function hex(buf){
+    var v = new Uint8Array(buf), out = '';
+    for (var i = 0; i < v.length; i++) out += v[i].toString(16).padStart(2, '0');
+    return out;
+  }
+  function sha256Hex(bytes){
+    if (!(self.crypto && crypto.subtle)) return Promise.resolve(null);
+    return crypto.subtle.digest('SHA-256', bytes).then(hex);
+  }
+  var enc = new TextEncoder();
+  function concatBytes(a, b){
+    var out = new Uint8Array(a.length + b.length);
+    out.set(a, 0); out.set(b, a.length); return out;
+  }
+  // §4 canonical form, valid over our restricted payload domain (see above).
+  function canonical(v){
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(function(k){
+      return JSON.stringify(k) + ':' + canonical(v[k]);
+    }).join(',') + '}';
+  }
+  // §5 domain-separated: H(space, v) = sha256(utf8(space) || 0x0A || canonical(v))
+  function H(space, v){
+    return sha256Hex(concatBytes(enc.encode(space + '\n'), enc.encode(canonical(v))));
+  }
+
+  var RAPPID = lsGet(K_RAPPID);
+  if (!RAPPID){
+    // tail is minted from entropy, then immutable for the life of this browser
+    RAPPID = 'pending';
+    sha256Hex(concatBytes(enc.encode('rapp/1:rappid\n'), uuidBytes())).then(function(tail){
+      RAPPID = tail ? ('rappid:@kody-w/second-seat:' + tail) : 'rappid:@kody-w/second-seat:unminted';
+      lsSet(K_RAPPID, RAPPID);
+      renderMem();
+    });
+  }
+  function streamId(){ return RAPPID + ':local'; }
+
+  var CHAIN = [];
+  (function(){
+    try {
+      var raw = lsGet(K_CHAIN);
+      var d = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(d)) CHAIN = d.filter(function(f){
+        return f && f.spec === 'rapp/1' && typeof f.payload === 'object' && f.payload;
+      });
+    } catch (e){ CHAIN = []; }
+  })();
+
+  var appending = Promise.resolve();
+  function appendFrame(payload){
+    // Serialised: each frame must see the true predecessor, so appends queue.
+    appending = appending.then(function(){
+      if (!storeOK || CHAIN.length >= MAX_FRAMES || RAPPID === 'pending') return;
+      if (window.PILOT_NAME && !payload.pilot) payload.pilot = String(window.PILOT_NAME);
+      var prevFrame = CHAIN.length ? CHAIN[CHAIN.length - 1] : null;
+      var d = new Date();
+      var frame = {
+        spec: 'rapp/1',
+        kind: DOGG.kind,
+        stream_id: streamId(),
+        seq: CHAIN.length,
+        utc: d.toISOString().replace(/\.(\d{3})\d*Z$/, '.$1Z'),
+        payload: payload,
+        payload_hash: null,
+        frame_hash: null,
+        prev: prevFrame ? prevFrame.payload_hash : null,
+        prev_wave: null,                 // memory-stream: always null (§7.4)
+        sig: null
+      };
+      return H('rapp/1:particle', payload).then(function(ph){
+        if (!ph) return;
+        frame.payload_hash = ph;
+        var pre = {};
+        Object.keys(frame).forEach(function(k){
+          if (k !== 'frame_hash' && k !== 'sig') pre[k] = frame[k];
+        });
+        return H('rapp/1:wave', pre).then(function(fh){
+          frame.frame_hash = fh;
+          CHAIN.push(frame);
+          lsSet(K_CHAIN, JSON.stringify(CHAIN));
+          renderMem();
+        });
+      });
+    }).catch(function(){ /* a failed append must never break the flight */ });
+    return appending;
+  }
+
+  // The logbook is a replay of the chain, not a second source of truth.
+  function project(){
+    var v = { cycle:0, portals:0, beats:0, takes:0, airtime:0, handoffs:0, realms:{} };
+    for (var i = 0; i < CHAIN.length; i++){
+      var p = CHAIN[i].payload || {};
+      switch (p.event){
+        case 'boot':    v.cycle++; break;
+        case 'reseed':  v.cycle++; break;
+        case 'portal':  v.portals++; if (p.to) v.realms[p.to] = 1; break;
+        case 'beat':    v.beats++; break;
+        case 'handoff': v.handoffs++; break;
+        case 'take':    v.takes++; v.airtime += (p.seconds || 0); break;
+      }
+      if (p.realm) v.realms[p.realm] = 1;
+    }
+    v.realmCount = Object.keys(v.realms).length;
+    return v;
+  }
+  function rankOf(cycle){ return 1 + Math.floor(cycle / 3); }   // bumps every 3 cycles
+
+  function renderMem(){
+    var v = project();
+    var rows = [
+      ['Cycle',       v.cycle],
+      ['Rank',        rankOf(v.cycle)],
+      ['Portals',     v.portals],
+      ['Waypoints',   v.beats],
+      ['Handoffs',    v.handoffs],
+      ['Takes saved', v.takes],
+      ['Airtime',     fmt(v.airtime)],
+      ['Realms seen', v.realmCount + '/' + REALMS.length],
+      ['Frames',      CHAIN.length + (CHAIN.length >= MAX_FRAMES ? ' (sealed)' : '')]
+    ];
+    memEl.textContent = '';
+    rows.forEach(function(r, i){
+      var dt = document.createElement('dt'); dt.textContent = r[0];
+      var dd = document.createElement('dd'); dd.textContent = r[1];
+      if (i === 1) dd.className = 'hi';
+      memEl.appendChild(dt); memEl.appendChild(dd);
+    });
+    var head = CHAIN.length ? CHAIN[CHAIN.length - 1] : null;
+    memNoteEl.textContent = !storeOK
+      ? 'This browser will not keep site data, so the chain cannot accumulate here.'
+      : (head
+          ? 'rapp/1 chain · head ' + String(head.frame_hash || '').slice(0, 12) +
+            '… · anchor ' + DOGG.revision + ' (pinned)'
+          : 'rapp/1 chain · empty · anchor ' + DOGG.revision + ' (pinned)');
+  }
+
+  /* ── The world ───────────────────────────────────────────────────────────
+     Five realms, each procedurally built once with its own palette, joined by
+     a glowing portal. Only the active realm is visible; travel is a
+     fade-to-black, so the cut is inside the recording rather than after it. */
+  var gl = document.createElement('canvas');
+  gl.width = 1280; gl.height = 720;
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true });
+  } catch (err){
+    die('This browser could not start WebGL, so the stage cannot run.');
+    return;
+  }
+  if (!renderer){ die('This browser could not start WebGL, so the stage cannot run.'); return; }
+  renderer.setPixelRatio(1);
+
+  var scene  = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(60, 16/9, 0.1, 2600);
+  var hemi = new THREE.HemisphereLight(0xffffff, 0x101820, 1.0); scene.add(hemi);
+  var key  = new THREE.DirectionalLight(0xffe6b8, 1.0);
+  key.position.set(40, 120, 20); scene.add(key);
+
+  // Wholly invented places — no borrowed world, no borrowed names.
+  var REALMS = [
+    { name:'THE PALE SHELF', sky:0x0B1014, fog:0x0B1014, ground:0x0d191d,
+      lo:0x152329, hi:0x2b6f74, sun:0xffe6b8, air:0x9fd8dd, tall:1.0 },
+    { name:'RUST BASIN',     sky:0x140D0B, fog:0x140D0B, ground:0x1d1210,
+      lo:0x2a1a15, hi:0x8a4a2c, sun:0xffb27a, air:0xd89a6a, tall:0.7 },
+    { name:'GLASS REACH',    sky:0x0A0F18, fog:0x0A0F18, ground:0x0f1622,
+      lo:0x18202f, hi:0x4a6ea8, sun:0xcfe0ff, air:0x8fa8d8, tall:1.5 },
+    { name:'THE LOW GARDEN', sky:0x0A140E, fog:0x0A140E, ground:0x101d14,
+      lo:0x17281c, hi:0x3f8a52, sun:0xd8ffcf, air:0x8fd8a0, tall:0.55 },
+    { name:'CINDER FLATS',   sky:0x14101A, fog:0x14101A, ground:0x1a1522,
+      lo:0x241d2e, hi:0x7a4aa8, sun:0xe8ccff, air:0xb69ad8, tall:0.85 }
+  ];
+
+  var seed = 7;
+  function rnd(){ seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+
+  function buildRealm(R, ri){
+    if (R.group) return R.group;
+    var g = new THREE.Group();
+    var grid = new THREE.GridHelper(2600, 110, R.hi, R.lo);
+    g.add(grid);
+    var ground = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600),
+      new THREE.MeshStandardMaterial({ color:R.ground, roughness:1, metalness:0 }));
+    ground.rotation.x = -Math.PI/2; ground.position.y = -0.6; g.add(ground);
+
+    // One unit box and two materials per realm, scaled per spire: 120 meshes
+    // instead of 120 geometries + 120 materials. Same picture, far cheaper to
+    // build and to traverse on whatever machine opens this.
+    var unit = new THREE.BoxGeometry(1, 1, 1);
+    var matLo = new THREE.MeshStandardMaterial({ color:R.lo, roughness:.85, metalness:.05 });
+    var matHi = new THREE.MeshStandardMaterial({ color:R.hi, roughness:.85, metalness:.05 });
+    for (var i = 0; i < 70; i++){
+      var h = (12 + rnd() * 90) * R.tall;
+      var m = new THREE.Mesh(unit, rnd() > .78 ? matHi : matLo);
+      m.scale.set(5 + rnd()*10, h, 5 + rnd()*10);
+      var a = rnd() * Math.PI * 2, r = 110 + rnd() * 700;
+      m.position.set(Math.cos(a)*r, h/2, Math.sin(a)*r);
+      g.add(m);
+    }
+
+    // Waypoints — a different shape of route in every realm.
+    R.plan = [];
+    var legs = 5, spin = rnd() * Math.PI * 2;
+    for (var b = 0; b < legs; b++){
+      var ang = spin + (b / legs) * Math.PI * 2;
+      var rad = 260 + rnd() * 320;
+      R.plan.push({
+        name: ['Leave the pad','Run the ridge','Turn at the beacon','Low pass','Climb out'][b],
+        vec: new THREE.Vector3(Math.cos(ang)*rad, 34 + rnd()*110, Math.sin(ang)*rad)
+      });
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(15, .8, 10, 40),
+        new THREE.MeshBasicMaterial({ color:R.hi, transparent:true, opacity:.55 }));
+      ring.position.copy(R.plan[b].vec);
+      g.add(ring);
+      R.plan[b].ring = ring;
+    }
+
+    /* The others. This is a nexus, not an empty map: agents live on the ground,
+       wander on their own business, and look UP when the craft comes over them.
+       One shared geometry and two materials for the whole crowd. */
+    R.agents = [];
+    var abody = new THREE.BoxGeometry(2.4, 7, 2.4);
+    var ahead = new THREE.BoxGeometry(3.0, 2.6, 3.0);
+    var amIdle  = new THREE.MeshStandardMaterial({ color:R.lo,  roughness:.7, metalness:.1 });
+    var amWatch = new THREE.MeshStandardMaterial({ color:R.air, roughness:.4, metalness:.2 });
+    for (var q = 0; q < 16; q++){
+      var ag = new THREE.Group();
+      var torso = new THREE.Mesh(abody, amIdle);
+      torso.position.y = 3.5;
+      var head = new THREE.Mesh(ahead, amIdle);
+      head.position.y = 8.6;
+      ag.add(torso); ag.add(head);
+      var aa = rnd() * Math.PI * 2, ar = 70 + rnd() * 520;
+      ag.position.set(Math.cos(aa)*ar, 0, Math.sin(aa)*ar);
+      g.add(ag);
+      R.agents.push({ o:ag, head:head, torso:torso, watching:false,
+                      idle:amIdle, watch:amWatch,
+                      tx:ag.position.x, tz:ag.position.z, spd:5 + rnd()*7 });
+    }
+
+    // The portal out of this realm.
+    R.portal = new THREE.Group();
+    var pr = new THREE.Mesh(new THREE.TorusGeometry(34, 2.6, 14, 60),
+      new THREE.MeshBasicMaterial({ color:R.air }));
+    var pdisc = new THREE.Mesh(new THREE.CircleGeometry(33, 48),
+      new THREE.MeshBasicMaterial({ color:R.air, transparent:true, opacity:.16,
+        side:THREE.DoubleSide }));
+    R.portal.add(pr); R.portal.add(pdisc);
+    R.portal.position.set(0, 78, -170);
+    g.add(R.portal);
+
+    R.group = g;
+    return g;
+  }
+
+  var realm = 0;
+  function R(){ return REALMS[realm]; }
+  function applyRealm(){
+    var r = R();
+    scene.background = new THREE.Color(r.sky);
+    scene.fog = new THREE.Fog(r.fog, 150, 1500);
+    hemi.color.setHex(r.air); key.color.setHex(r.sun);
+    buildRealm(r, realm);
+    for (var i = 0; i < REALMS.length; i++){
+      var g = REALMS[i].group;
+      if (!g) continue;
+      if (i === realm){ if (!g.parent) scene.add(g); }
+      else if (g.parent) scene.remove(g);
+    }
+  }
+  applyRealm();
+
+  var craft = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.ConeGeometry(2.2, 9, 6),
+    new THREE.MeshStandardMaterial({ color:0xE4B54A, roughness:.35, metalness:.5 }));
+  body.rotation.x = Math.PI/2; craft.add(body);
+  var fin = new THREE.Mesh(new THREE.BoxGeometry(11, .5, 2.6),
+    new THREE.MeshStandardMaterial({ color:0xE9EEF2, roughness:.5 }));
+  fin.position.z = 1; craft.add(fin);
+  craft.position.set(0, 60, 150);
+  scene.add(craft);
+
+  var vel = new THREE.Vector3();
+  var heading = Math.PI;
+  var beat = 0;
+  var toVec = new THREE.Vector3(), fwdVec = new THREE.Vector3(), camWant = new THREE.Vector3();
+
+  function buildBeatList(){
+    beatsEl.textContent = '';
+    R().plan.forEach(function(p, idx){
+      var li = document.createElement('li');
+      var n = document.createElement('span'); n.className='n'; n.textContent = (idx+1);
+      var t = document.createElement('span'); t.textContent = p.name;
+      var d = document.createElement('span'); d.className='d';
+      li.appendChild(n); li.appendChild(t); li.appendChild(d);
+      beatsEl.appendChild(li);
+      p.el = li; p.dist = d;
+    });
+    markBeats();
+  }
+  function nearestBeat(){
+    var best = 0, bestD = Infinity, plan = R().plan;
+    for (var i = 0; i < plan.length; i++){
+      var d = craft.position.distanceTo(plan[i].vec);
+      if (d < bestD){ bestD = d; best = i; }
+    }
+    return best;
+  }
+  function markBeats(){
+    var plan = R().plan;
+    for (var i = 0; i < plan.length; i++){
+      if (plan[i].el) plan[i].el.dataset.state = i === beat ? 'live' : (i < beat ? 'done' : 'todo');
+    }
+  }
+  function beatName(){ return R().plan[beat].name; }
+
+  function pilot(){
+    var plan = R().plan, target = plan[beat];
+    toVec.copy(target.vec).sub(craft.position);
+    var dist = toVec.length();
+    if (dist < 34){
+      beat = (beat + 1) % plan.length;
+      markBeats();
+      appendFrame({ event:'beat', realm: R().name, beat: beat });
+      log('Beat ' + (beat+1) + ' — ' + beatName());
+      toVec.copy(plan[beat].vec).sub(craft.position);
+      dist = toVec.length();
+    }
+    var want = Math.atan2(toVec.x, toVec.z);
+    var diff = Math.atan2(Math.sin(want - heading), Math.cos(want - heading));
+    controls.left  = diff >  0.04 ? 1 : 0;
+    controls.right = diff < -0.04 ? 1 : 0;
+    controls.fwd   = 1;
+    controls.back  = 0;
+    controls.up    = toVec.y > 3 ? 1 : 0;
+    controls.boost = (dist > 160 && Math.abs(diff) < 0.5) ? 1 : 0;
+  }
+
+  function fly(dt){
+    heading += (controls.left - controls.right) * 1.5 * dt;
+    fwdVec.set(Math.sin(heading), 0, Math.cos(heading));
+    var thrust = (controls.fwd - controls.back) * (controls.boost ? 190 : 110);
+    vel.addScaledVector(fwdVec, thrust * dt);
+    vel.y += (controls.up ? 62 : -26) * dt;
+    vel.multiplyScalar(Math.pow(0.22, dt));
+    craft.position.addScaledVector(vel, dt);
+    if (craft.position.y < 6){ craft.position.y = 6; if (vel.y < 0) vel.y = 0; }
+    craft.rotation.y = heading;
+    craft.rotation.z = -(controls.left - controls.right) * 0.42;
+  }
+
+  /* ── The others, watching ────────────────────────────────────────────────
+     An agent that can see the craft turns to face it and tilts its head up.
+     "Can see" is deliberately simple and honest: within SEE_RANGE horizontally,
+     and the craft above the rooftops rather than down among them. */
+  var SEE_RANGE = 260;
+  var watchers = 0, seenLogged = false;
+
+  function updateAgents(dt){
+    var list = R().agents || [], n = 0;
+    for (var i = 0; i < list.length; i++){
+      var a = list[i], o = a.o;
+      var dx = craft.position.x - o.position.x, dz = craft.position.z - o.position.z;
+      var flat = Math.sqrt(dx*dx + dz*dz);
+      var sees = flat < SEE_RANGE && craft.position.y > 12;
+      if (sees){
+        n++;
+        // turn to face it, and tilt the head up by the real elevation angle
+        o.rotation.y = Math.atan2(dx, dz);
+        var elev = Math.atan2(craft.position.y - 8.6, Math.max(1, flat));
+        a.head.rotation.x = -Math.min(1.3, elev);
+      } else {
+        a.head.rotation.x *= Math.pow(0.2, dt);            // settle back down
+        // wander: pick a new spot when this one is reached
+        var wx = a.tx - o.position.x, wz = a.tz - o.position.z;
+        var wd = Math.sqrt(wx*wx + wz*wz);
+        if (wd < 4){
+          var na = Math.random() * Math.PI * 2, nr = 70 + Math.random() * 520;
+          a.tx = Math.cos(na)*nr; a.tz = Math.sin(na)*nr;
+        } else {
+          o.position.x += (wx/wd) * a.spd * dt;
+          o.position.z += (wz/wd) * a.spd * dt;
+          o.rotation.y = Math.atan2(wx, wz);
+        }
+      }
+      if (a.watching !== sees){
+        a.watching = sees;
+        a.torso.material = sees ? a.watch : a.idle;
+        a.head.material  = sees ? a.watch : a.idle;
+      }
+    }
+    watchers = n;
+    if (!seenLogged && n >= 4){
+      seenLogged = true;
+      appendFrame({ event:'seen', realm: R().name, watchers: n });
+      log(n + ' below looked up');
+    }
+  }
+
+  /* ── The director ────────────────────────────────────────────────────────
+     Twenty-two shots. The director owns the CAMERA; the pilot owns the CRAFT.
+     A shot CUTS (it does not glide) every 4.6-7.2s, which is what makes this
+     read as coverage rather than one long drone orbit. Taking the stick pins
+     the camera to Chase Low, because a shot you are not flying is a shot you
+     cannot steer by. */
+  var SHOTS = [
+    { n:'Chase Low',       f:function(t,p,f){ return [p.clone().addScaledVector(f,-46).setY(p.y+14), p]; } },
+    { n:'Chase High',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-70).setY(p.y+58), p]; } },
+    { n:'Wing Left',       f:function(t,p,f){ return [p.clone().add(new THREE.Vector3(-f.z,0,f.x).multiplyScalar(34)).setY(p.y+6), p]; } },
+    { n:'Wing Right',      f:function(t,p,f){ return [p.clone().add(new THREE.Vector3(f.z,0,-f.x).multiplyScalar(34)).setY(p.y+6), p]; } },
+    { n:'Nose',            f:function(t,p,f){ return [p.clone().addScaledVector(f,42).setY(p.y+8), p]; } },
+    { n:'Tail Drift',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-96).setY(p.y+26), p]; } },
+    { n:'Orbit Slow',      f:function(t,p){ var a=t*0.35; return [p.clone().add(new THREE.Vector3(Math.cos(a)*62,20,Math.sin(a)*62)), p]; } },
+    { n:'Orbit Fast',      f:function(t,p){ var a=t*0.95; return [p.clone().add(new THREE.Vector3(Math.cos(a)*48,12,Math.sin(a)*48)), p]; } },
+    { n:'Crane Up',        f:function(t,p,f){ return [p.clone().addScaledVector(f,-40).setY(p.y+30+t*22), p]; } },
+    { n:'Crane Down',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-40).setY(p.y+150-t*22), p]; } },
+    { n:'Ground Pass',     f:function(t,p,f){ return [p.clone().addScaledVector(f,-30).setY(9), p]; } },
+    { n:'Top Down',        f:function(t,p){ return [p.clone().setY(p.y+165), p]; } },
+    { n:'Wide Establish',  f:function(t,p){ return [new THREE.Vector3(430,215,430), p]; } },
+    { n:'Portal Approach', f:function(t,p){ var q=R().portal.position; return [q.clone().add(new THREE.Vector3(0,16,120)), p]; } },
+    { n:'Through The Ring',f:function(t,p){ var q=R().portal.position; return [q.clone().add(new THREE.Vector3(0,2,-54)), p]; } },
+    { n:'Low Skim',        f:function(t,p,f){ return [p.clone().addScaledVector(f,-54).setY(11), p]; } },
+    { n:'High Overview',   f:function(t,p){ return [p.clone().add(new THREE.Vector3(120,240,120)), p]; } },
+    { n:'Side Track',      f:function(t,p,f){ return [p.clone().add(new THREE.Vector3(-f.z,0,f.x).multiplyScalar(96)).setY(p.y+22), p]; } },
+    { n:'Rear Climb',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-64).setY(p.y+38+t*12), p]; } },
+    { n:'Dutch Roll',      f:function(t,p,f){ return [p.clone().addScaledVector(f,-44).setY(p.y+16+Math.sin(t*1.4)*13), p]; } },
+    { n:'Beacon Frame',    f:function(t,p){ return [shotAnchor.clone().add(new THREE.Vector3(0,26,74)), p]; } },
+    { n:"Agent's Eye",     f:function(t,p){
+        var list = R().agents || [], best = null, bd = 1e9;
+        for (var i = 0; i < list.length; i++){
+          if (!list[i].watching) continue;
+          var d = list[i].o.position.distanceToSquared(p);
+          if (d < bd){ bd = d; best = list[i]; }
+        }
+        if (!best) return [p.clone().add(new THREE.Vector3(0,-40,60)).setY(9), p];
+        return [best.o.position.clone().setY(9.4), p];   // from the ground, looking up
+      } },
+    { n:'Over The Crowd',  f:function(t,p){
+        var list = R().agents || [];
+        if (!list.length) return [p.clone().setY(p.y+120), p];
+        var a = list[Math.floor(t * 0.4) % list.length];
+        return [a.o.position.clone().setY(46), p];
+      } },
+    { n:'Long Lens',       f:function(t,p,f){ return [p.clone().addScaledVector(f,-235).setY(p.y+46), p]; } }
+  ];
+  var shot = 0, shotUntil = 0, shotT = 0;
+  function shotName(){
+    if (lookActive(performance.now())) return 'Free look';
+    return WHO === 'manual' ? 'Chase Low' : SHOTS[shot].n;
+  }
+  var shotAnchor = new THREE.Vector3();
+  function cutTo(i, now){
+    shot = i; shotT = 0;
+    shotUntil = now + (4600 + Math.random() * 2600);
+    // Freeze what the shot is framing. Reading plan[beat] live meant the camera
+    // teleported hundreds of units mid-shot the moment the pilot passed a beat.
+    shotAnchor.copy(R().plan[Math.min(beat, R().plan.length - 1)].vec);
+  }
+
+  function directCamera(now, dt){
+    if (lookActive(now)){
+      // Orbit the craft on the angles the drag set; the pilot keeps flying.
+      var yaw = heading + lookYaw, cp = Math.cos(lookPitch);
+      camWant.set(
+        craft.position.x - Math.sin(yaw) * cp * 52,
+        craft.position.y + Math.sin(lookPitch) * 52 + 8,
+        craft.position.z - Math.cos(yaw) * cp * 52
+      );
+      if (camWant.y < 7) camWant.y = 7;
+      camera.position.lerp(camWant, 1 - Math.pow(0.0009, dt));
+      camera.lookAt(craft.position);
+      return;
+    }
+    if (WHO === 'manual'){
+      camWant.copy(craft.position).addScaledVector(fwdVec, -46); camWant.y += 14;
+      camera.position.lerp(camWant, 1 - Math.pow(0.0025, dt));
+      camera.lookAt(craft.position);
+      return;
+    }
+    if (now > shotUntil) cutTo((shot + 1 + Math.floor(Math.random()*3)) % SHOTS.length, now);
+    shotT += dt;
+    var out;
+    try { out = SHOTS[shot].f(shotT, craft.position, fwdVec); }
+    catch (e){ out = [craft.position.clone().addScaledVector(fwdVec,-46).setY(craft.position.y+14),
+                      craft.position]; }
+    camera.position.copy(out[0]);
+    if (camera.position.distanceTo(craft.position) < 12){
+      camera.position.copy(craft.position).addScaledVector(fwdVec, -12);
+    }
+    camera.lookAt(out[1]);
+  }
+
+  /* ── Portals ─────────────────────────────────────────────────────────────
+     Travel every 65-85s: fade to black, swap realm, fade up. The fade is drawn
+     into the program canvas, so it is part of the take, not something added
+     afterwards. */
+  var TRAVEL_MS = 1500;
+  var nextPortal = performance.now() + 65000 + Math.random() * 20000;
+  var travelling = false, travelStart = 0, swapped = false;
+
+  function enterPortal(now){
+    travelling = true; travelStart = now; swapped = false;
+    log('Portal — leaving ' + R().name);
+  }
+  function travelTick(now){
+    var k = (now - travelStart) / TRAVEL_MS;
+    if (!swapped && k >= 0.5){
+      swapped = true;
+      var fromName = R().name;
+      realm = (realm + 1) % REALMS.length;
+      applyRealm();
+      craft.position.set(0, 70, 150);
+      vel.set(0,0,0); heading = Math.PI;
+      beat = 0;
+      buildBeatList();
+      seenLogged = false;
+      appendFrame({ event:'portal', from: fromName, to: R().name });
+      log('Arrived — ' + R().name);
+      // deliberately NOT say(): #status carries recording and save messages, and
+      // a portal mid-take used to overwrite "Take ready — 4.2 MiB". The realm
+      // chip and the take log both already announce the arrival.
+    }
+    if (k >= 1){
+      travelling = false;
+      nextPortal = now + 65000 + Math.random() * 20000;
+    }
+    return Math.max(0, 1 - Math.abs(k - 0.5) * 2);   // 0 -> 1 -> 0 opacity
+  }
+
+  /* ── The cut, made while it happens ──────────────────────────────────── */
+  var recording = false, recStart = 0, fadeAlpha = 0, lastTakeSeconds = 0;
+
+  function overlay(now){
+    var W = program.width, H = program.height;
+
+    if (recording){
+      var el = (now - recStart) / 1000;
+      if (el < 2.2){
+        pctx.globalAlpha = el < 1.7 ? 1 : (2.2 - el) / .5;
+        pctx.fillStyle = 'rgba(8,14,18,.72)'; pctx.fillRect(0, 0, W, H);
+        pctx.fillStyle = '#E4EAEF';
+        pctx.font = '800 62px "Bricolage Grotesque", sans-serif';
+        pctx.fillText('Second Seat', 74, H/2 - 6);
+        pctx.fillStyle = '#3FB2BB';
+        pctx.font = '500 21px "IBM Plex Mono", monospace';
+        pctx.fillText('A PILOT FLIES · YOU CAN TAKE THE STICK', 76, H/2 + 34);
+        pctx.globalAlpha = 1;
+      }
+      var plateY = H - 122, plateH = 74;
+      pctx.fillStyle = 'rgba(8,14,18,.68)';
+      pctx.fillRect(56, plateY, 560, plateH);
+      pctx.fillStyle = WHO === 'auto' ? '#3FB2BB' : '#E4B54A';
+      pctx.fillRect(56, plateY, 4, plateH);
+      pctx.font = '500 13px "IBM Plex Mono", monospace';
+      pctx.fillText((WHO === 'auto' ? 'PILOT FLYING' : (window.PILOT_NAME ? ('@' + window.PILOT_NAME + ' HAS THE STICK') : 'YOU HAVE THE STICK')) +
+        '  ·  REALM ' + (realm+1) + ' OF ' + REALMS.length + '  ·  ' + shotName().toUpperCase(),
+        74, plateY + 24);
+      pctx.fillStyle = '#E4EAEF';
+      pctx.font = '600 22px "IBM Plex Sans", sans-serif';
+      pctx.fillText(R().name + ' — ' + beatName(), 74, plateY + 54);
+
+      pctx.fillStyle = '#E9563F';
+      pctx.beginPath(); pctx.arc(W - 152, plateY + 34, 8, 0, Math.PI*2); pctx.fill();
+      pctx.fillStyle = '#E4EAEF';
+      pctx.font = '500 19px "IBM Plex Mono", monospace';
+      pctx.fillText(fmt(el), W - 132, plateY + 41);
+    }
+
+    // The portal fade goes on top of everything, recorded or not.
+    if (fadeAlpha > 0){
+      pctx.globalAlpha = Math.min(1, fadeAlpha);
+      pctx.fillStyle = '#000';
+      pctx.fillRect(0, 0, W, H);
+      pctx.globalAlpha = 1;
+    }
+  }
+
+  var last = performance.now();
+  function frame(now){
+    try { step(now); } catch (err){
+      say('The stage stopped: ' + (err && err.message ? err.message : err));
+      log('Stage stopped · ' + (err && err.message ? err.message : err));
+      return;
+    }
+    requestAnimationFrame(frame);
+  }
+  function step(now){
+    var dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now;
+
+    if (WHO === 'manual' && now - lastHuman > 2600) setSeat('auto', 'Pilot resumed');
+    if (WHO === 'auto') pilot();
+    fly(dt);
+    updateAgents(dt);
+
+    // While a person has the stick the portal clock is PAUSED, not merely
+    // gated — otherwise the deadline elapses during manual flight and a portal
+    // fires on the very first frame after they let go.
+    if (WHO === 'manual' && !travelling) nextPortal += dt * 1000;
+    if (!travelling && WHO === 'auto' && now > nextPortal) enterPortal(now);
+    fadeAlpha = travelling ? travelTick(now) : 0;
+
+    directCamera(now, dt);
+
+    var plan = R().plan;
+    for (var i = 0; i < plan.length; i++){
+      plan[i].ring.rotation.y += dt * 0.8;
+      if (plan[i].dist){
+        plan[i].dist.textContent = Math.round(craft.position.distanceTo(plan[i].vec)) + 'm';
+      }
+    }
+    // Spinning about z is invisible: the torus and the disc are both symmetric
+    // around it. Shimmer instead — a slow sway plus a breathing scale.
+    var pt = R().portal, ph = now * 0.001;
+    pt.rotation.y = Math.sin(ph * 0.6) * 0.42;
+    var pulse = 1 + Math.sin(ph * 1.7) * 0.03;
+    pt.scale.set(pulse, pulse, 1);
+
+    renderer.render(scene, camera);
+    pctx.drawImage(gl, 0, 0, program.width, program.height);
+    overlay(now);
+
+    if (recording) tcEl.textContent = fmt((now - recStart)/1000);
+    // Rewriting textContent every frame replaces the text node, so a reader can
+    // never select the text and assistive tech re-announces it 60x a second.
+    setText(shotEl, shotName());
+    setText(realmEl, 'REALM ' + (realm+1) + '/' + REALMS.length + ' · ' + R().name);
+    setText(watchEl, watchers + ' of ' + (R().agents ? R().agents.length : 0) + ' watching');
+  }
+
+  /* A reseed every ten minutes: the realms are rebuilt from a new seed, so the
+     world is different, while the chain carries straight on across it. That is
+     what "it remembers" means here — the places change, the record does not. */
+  function disposeRealm(Rm){
+    if (!Rm.group) return;
+    if (Rm.group.parent) scene.remove(Rm.group);
+    var seenG = [], seenM = [];
+    Rm.group.traverse(function(o){
+      if (o.geometry && seenG.indexOf(o.geometry) < 0){ seenG.push(o.geometry); o.geometry.dispose(); }
+      var m = o.material;
+      if (m){
+        (Array.isArray(m) ? m : [m]).forEach(function(mm){
+          if (seenM.indexOf(mm) < 0){ seenM.push(mm); mm.dispose(); }
+        });
+      }
+    });
+    Rm.group = null;
+    Rm.plan = null;
+  }
+  function reseed(){
+    for (var i = 0; i < REALMS.length; i++) disposeRealm(REALMS[i]);
+    seed = (Date.now() % 2147483647) || 7;
+    realm = 0; beat = 0;
+    craft.position.set(0, 60, 150); vel.set(0,0,0); heading = Math.PI;
+    applyRealm();
+    buildBeatList();
+    appendFrame({ event:'reseed', realm: R().name });
+    log('Reseed — a new world, same logbook');
+    say('Reseeded. New world, same logbook.');
+  }
+  setInterval(reseed, 600000);
+
+  buildBeatList();
+  appendFrame({ event:'boot', realm: R().name });
+  renderMem();
+  cutTo(0, performance.now());
+  requestAnimationFrame(frame);
+  log('World loaded · ' + R().name);
+  log('Beat 1 — ' + beatName());
+
+  /* ── Recording ───────────────────────────────────────────────────────────
+     Budget, not vibes: 1.1 Mbps x 60 s ≈ 8.3 MB, comfortably inside the 16 MiB
+     save ceiling. Bytes are counted as they arrive and the take stops itself at
+     12 MiB whatever the clock says. The cap runs on a wall-clock timer as well
+     as in the frame loop, because a hidden tab stops calling rAF entirely. */
+  var BITRATE   = 1100000;
+  var MAX_SEC   = 60;
+  var MAX_BYTES = 12 * 1024 * 1024;
+  var HARD_MAX  = 16 * 1024 * 1024;
+
+  var recorder = null, chunks = [], bytes = 0, blob = null, MIME = '', stream = null;
+  var capTimer = null, takeNo = 0;
+
+  function pickMime(){
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+    var opts = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+    for (var i = 0; i < opts.length; i++){
+      if (MediaRecorder.isTypeSupported(opts[i])) return opts[i];
+    }
+    return '';
+  }
+  function extFor(mime){ return mime.indexOf('mp4') > -1 ? 'mp4' : 'webm'; }
+
+  function startRec(){
+    MIME = pickMime();
+    if (!MIME){ say('This browser cannot record video, so a take cannot be made here.');
+                recBtn.disabled = true; return; }
+    if (typeof program.captureStream !== 'function'){
+      say('This browser cannot capture the stage canvas, so a take cannot be made here.');
+      recBtn.disabled = true; return;
+    }
+    try { stream = program.captureStream(30); }
+    catch (err){ say('The stage canvas could not be captured, so recording is unavailable here.');
+                 recBtn.disabled = true; return; }
+
+    var mine = ++takeNo;                       // late chunks from an old take are dropped
+    chunks = []; bytes = 0; blob = null;
+    saveBtn.disabled = true; sizeEl.textContent = ''; sizeEl.dataset.over = 'false';
+
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: BITRATE });
+    } catch (err){
+      say('This browser refused to start the recorder, so a take cannot be made here.');
+      recBtn.disabled = true; stopTracks(); return;
+    }
+    recorder.ondataavailable = function(e){
+      if (mine !== takeNo) return;
+      if (e.data && e.data.size){
+        chunks.push(e.data); bytes += e.data.size;
+        sizeEl.textContent = (bytes/1048576).toFixed(1) + ' MiB';
+        if (bytes > MAX_BYTES) stopRec('Take stopped at the size budget so it stays saveable.');
+      }
+    };
+    recorder.onstop = function(){
+      if (mine !== takeNo) return;
+      blob = new Blob(chunks, { type: MIME });
+      stopTracks();
+      var mib = blob.size / 1048576;
+      sizeEl.textContent = mib.toFixed(1) + ' MiB';
+      sizeEl.dataset.over = String(blob.size > HARD_MAX);
+      if (blob.size === 0){
+        // Exactly what happened on a throttled tab: a take with no frames in it.
+        saveBtn.disabled = true;
+        say('That take captured no frames — keep this tab visible while recording, then try again.');
+        log('Take discarded · 0 frames');
+      } else if (blob.size > HARD_MAX){
+        saveBtn.disabled = true;
+        say('That take is ' + mib.toFixed(1) + ' MiB, past the 16 MiB save limit. Record a shorter one.');
+        log('Take too large · ' + mib.toFixed(1) + ' MiB');
+      } else {
+        saveBtn.disabled = false;
+        say('Take ready — ' + mib.toFixed(1) + ' MiB, already cut. Save it whenever you like.');
+        log('Take ready · ' + mib.toFixed(1) + ' MiB');
+      }
+    };
+    recorder.start(250);
+    recording = true; recStart = performance.now();
+    recBtn.classList.add('armed'); recLbl.textContent = 'Stop';
+    capTimer = setTimeout(function(){
+      stopRec('Take capped at ' + MAX_SEC + ' seconds.');
+    }, MAX_SEC * 1000);
+    say('Recording. The titles and lower third are going into the file as it runs.');
+    log('Recording started');
+  }
+
+  function stopTracks(){
+    if (stream){
+      try { stream.getTracks().forEach(function(t){ t.stop(); }); } catch (e){}
+      stream = null;
+    }
+  }
+  function stopRec(why){
+    if (!recording) return;
+    recording = false;
+    lastTakeSeconds = (performance.now() - recStart) / 1000;
+    if (capTimer){ clearTimeout(capTimer); capTimer = null; }
+    try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch (e){ stopTracks(); }
+    recBtn.classList.remove('armed');            // v1 added the class again here
+    recLbl.textContent = 'Record';
+    log(why || 'Recording stopped');
+  }
+  recBtn.addEventListener('click', function(){
+    recording ? stopRec() : startRec();
+    program.focus();              // a click on a button must not disarm the keys
+  });
+
+  /* ── The way out ─────────────────────────────────────────────────────── */
+  var downloads = null, downloadsResolved = false;
+  if (window.claude && typeof claude.use === 'function'){
+    claude.use('downloads').then(function(d){
+      downloads = d; downloadsResolved = true;
+      if (!d) saveBtn.title = 'Saving files is not available in this view.';
+    }).catch(function(){ downloadsResolved = true; });
+  } else {
+    downloadsResolved = true;
+  }
+
+  saveBtn.addEventListener('click', function(){
+    if (!blob || !blob.size) return;
+    if (!downloadsResolved){ say('Still connecting to the save service — try again in a moment.'); return; }
+    if (!downloads){
+      say('This view cannot save files. Open the artifact in its own tab and record again.');
+      return;
+    }
+    var ext  = extFor(MIME);
+    var name = 'second-seat-take-' +
+      new Date().toISOString().slice(11,19).replace(/:/g,'') + '.' + ext;
+    saveBtn.disabled = true;
+    var tookSec = Math.round(lastTakeSeconds);
+    downloads.save({ filename: name, data: blob }).then(function(){
+      appendFrame({ event:'take', seconds: tookSec, bytes: blob.size, realm: R().name });
+      say('Saved ' + name + '.');
+      log('Saved ' + name);
+    }).catch(function(err){
+      var code = err && err.code;
+      say(
+        code === 'declined'             ? 'Save cancelled — the take is still here.' :
+        code === 'too_large'            ? 'That take is over the 16 MiB limit. Record a shorter one.' :
+        code === 'rate_limited'         ? 'A save prompt is already open. Finish it, then try again.' :
+        code === 'rejected_extension' ||
+        code === 'extension_not_enabled'? 'This view will not accept a .' + ext + ' file.' :
+        code === 'bad_request'          ? 'That take could not be packaged for saving.' :
+                                          'Saving is unavailable in this view.'
+      );
+    }).then(function(){
+      if (blob && blob.size && blob.size <= HARD_MAX) saveBtn.disabled = false;
+    });
+  });
+
+  saveBtn.textContent = 'Save take';
+  program.addEventListener('click', function(){ program.focus(); });
+
+  // the auth block lives outside this IIFE; give it the three things it needs
+  window.SS_say   = say;
+  window.SS_log   = log;
+  window.SS_frame = appendFrame;
+  window.SS_pilot = function(){ return (window.PILOT_NAME || null); };
+})();
+</script>
+
+<script>
+
+/* ── Auth: the same front door as Heimdall ────────────────────────────────────
+   GitHub OAuth DEVICE-CODE flow (not the web flow), proxied through the estate's
+   auth worker because github.com's device endpoints send no CORS headers to a
+   Pages origin. Identical constants and identical storage shape to
+   kody-w/heimdall's doorman, and the token lives under the shared `rapp_settings`
+   key — same origin as every other front door on kody-w.github.io, so signing in
+   here signs you in there and vice versa.
+
+   The worker's Access-Control-Allow-Origin is pinned to https://kody-w.github.io,
+   which is exactly why this page is served from there and not from an artifact
+   iframe: an artifact's CSP blocks fetch outright, and the worker would refuse
+   its origin anyway. */
+const AUTH_WORKER_URL   = "https://rapp-auth.kwildfeuer.workers.dev";
+const COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+const STORAGE_KEY       = "rapp_settings";
+
+function loadSettings(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+                         catch (e){ return {}; } }
+function saveSettings(patch){
+  try {
+    var s = Object.assign(loadSettings(), patch);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    return s;
+  } catch (e){ return {}; }
+}
+function getToken(){ return loadSettings().ghuToken || null; }
+
+var pendingDeviceLogin = null;
+
+async function startDeviceLogin(){
+  const r = await fetch(AUTH_WORKER_URL + "/api/auth/device", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: COPILOT_CLIENT_ID, scope: "read:user" })
+  });
+  if (!r.ok) throw new Error("device start " + r.status);
+  const d = await r.json();
+  pendingDeviceLogin = {
+    device_code: d.device_code,
+    interval: d.interval || 5,
+    expires_at: Date.now() + (d.expires_in || 900) * 1000
+  };
+  return { user_code: d.user_code, verification_uri: d.verification_uri };
+}
+
+async function pollDeviceLogin(){
+  if (!pendingDeviceLogin) return null;
+  const r = await fetch(AUTH_WORKER_URL + "/api/auth/device/poll", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_code: pendingDeviceLogin.device_code,
+                           client_id: COPILOT_CLIENT_ID })
+  });
+  const d = await r.json();
+  if (d.access_token){
+    saveSettings({ ghuToken: d.access_token });
+    pendingDeviceLogin = null;
+    return d.access_token;
+  }
+  if (d.error === "authorization_pending" || d.error === "slow_down") return null;
+  if (d.error){ pendingDeviceLogin = null; throw new Error(d.error_description || d.error); }
+  return null;
+}
+
+async function fetchAndCacheUser(token){
+  try {
+    const r = await fetch("https://api.github.com/user", {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    if (u.login){ saveSettings({ ghUser: { login: u.login, avatar: u.avatar_url || "" } }); return u; }
+  } catch (e){}
+  return null;
+}
+
+var PILOT = (loadSettings().ghUser || {}).login || null;
+window.PILOT_NAME = PILOT;
+
+function paintAuth(){
+  var authBtn = document.getElementById('authBtn');
+  var whoEl   = document.getElementById('who');
+  if (PILOT){
+    whoEl.hidden = false;
+    whoEl.textContent = '@' + PILOT + ' in the seat';
+    authBtn.textContent = 'Sign out';
+  } else {
+    whoEl.hidden = true;
+    authBtn.textContent = 'Sign in with GitHub';
+  }
+}
+
+document.getElementById('authBtn').addEventListener('click', async function(){
+  var authBtn = document.getElementById('authBtn');
+  if (PILOT){
+    saveSettings({ ghuToken: "", ghUser: null });
+    PILOT = null; window.PILOT_NAME = null; paintAuth();
+    window.SS_say && window.SS_say('Signed out. The logbook stays — it is this browser’s, not the account’s.');
+    return;
+  }
+  try {
+    authBtn.disabled = true;
+    authBtn.textContent = 'Starting…';
+    var d = await startDeviceLogin();
+    window.SS_say && window.SS_say('Enter code ' + d.user_code + ' at ' + d.verification_uri + ' — this page is waiting.');
+    authBtn.textContent = d.user_code;
+    window.open(d.verification_uri, '_blank', 'noopener');
+    var tick = setInterval(async function(){
+      try {
+        var tok = await pollDeviceLogin();
+        if (!tok) return;
+        clearInterval(tick);
+        var u = await fetchAndCacheUser(tok);
+        PILOT = u && u.login ? u.login : null; window.PILOT_NAME = PILOT;
+        authBtn.disabled = false;
+        paintAuth();
+        window.SS_say && window.SS_say(PILOT ? ('Signed in as @' + PILOT + '.') : 'Signed in.');
+        window.SS_log && window.SS_log(PILOT ? ('@' + PILOT + ' took the second seat') : 'Signed in');
+        window.SS_frame && window.SS_frame({ event:'signin', pilot: PILOT || 'unknown' });
+      } catch (err){
+        clearInterval(tick);
+        authBtn.disabled = false; paintAuth();
+        window.SS_say && window.SS_say('Sign-in failed: ' + err.message);
+      }
+    }, (pendingDeviceLogin && pendingDeviceLogin.interval ? pendingDeviceLogin.interval : 5) * 1000);
+  } catch (err){
+    authBtn.disabled = false; paintAuth();
+    window.SS_say && window.SS_say('Could not start sign-in: ' + err.message);
+  }
+});
+paintAuth();
+
+</script>
+</body>
+</html>
