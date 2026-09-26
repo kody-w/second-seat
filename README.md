@@ -1,5 +1,9 @@
 # Second Seat
 
+<!-- rapp1:network-header:start -->
+[![RAPP/1](https://kody-w.github.io/rapp-hive-public/portfolio/badges/second-seat.svg)](https://github.com/kody-w/rapp-hive-public/blob/main/portfolio/repos/second-seat.md) · **New to RAPP?** [Start here: get your Brainstem →](https://github.com/kody-w/rapp-installer#start-here)
+<!-- rapp1:network-header:end -->
+
 > A pilot flies this world through the same six controls you have. The others below look up.
 
 **Live:** https://kody-w.github.io/second-seat/
